@@ -1,1 +1,22 @@
 /* You can add global styles to this file, and also import other style files */
+@import "primeflex/primeflex.css";
+@import "primeicons/primeicons.css";
+@import "leaflet/dist/leaflet.css";
+
+/* Configuración de la tipografía */
+:root {
+  font-family: 'Roboto', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow-x: hidden;
+}
+
+.leaflet-container {
+  /* Mantén tus estilos de Leaflet aquí */
+}
+
+/* Ya no pongas ningún @import de node_modules */
