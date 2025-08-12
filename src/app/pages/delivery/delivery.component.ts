@@ -213,6 +213,7 @@ export class DeliveryComponent implements OnInit, OnDestroy {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          console.log('Coordenadas obtenidas:', { latitude, longitude }); // Agregar este log
           this.currentPosition = { latitude, longitude };
           
           // Actualizar el mapa

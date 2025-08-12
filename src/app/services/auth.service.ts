@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { User } from '../interfaces/user.interface';
 import { environment } from '../../environments/environment';
+import { SocketService } from './socket.service';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +13,10 @@ export class AuthService {
   public currentUser$ = this.currentUserSubject.asObservable();
   private apiUrl = `${environment.apiUrl}/auth`;
 
-  constructor(private http: HttpClient) {
+  constructor(
+    private http: HttpClient,
+    private socketService: SocketService
+  ) {
     this.loadUserFromStorage();
   }
 
@@ -30,11 +34,23 @@ export class AuthService {
         tap(user => {
           localStorage.setItem('currentUser', JSON.stringify(user));
           this.currentUserSubject.next(user);
+          
+          // Si es delivery, notificar al socket que se conectó
+          if (user.role === 'delivery') {
+            this.socketService.notifyDeliveryLogin(user);
+          }
         })
       );
   }
 
   logout(): void {
+    const currentUser = this.currentUserValue;
+    
+    // Si es delivery, notificar desconexión
+    if (currentUser?.role === 'delivery') {
+      this.socketService.notifyDeliveryLogout(currentUser.id);
+    }
+    
     localStorage.removeItem('currentUser');
     this.currentUserSubject.next(null);
   }
