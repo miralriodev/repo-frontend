@@ -16,7 +16,7 @@ export class SocketService {
   private activeDeliveriesUpdated = new Subject<number[]>();
 
   constructor() {
-    this.socket = io(environment.socketUrl);  // Usar socketUrl en lugar de apiUrl
+    this.socket = io(environment.socketUrl);
     this.setupSocketListeners();
   }
 
@@ -70,5 +70,10 @@ export class SocketService {
     if (this.socket) {
       this.socket.disconnect();
     }
+  }
+
+  // Nuevo método para notificar que el admin se conectó
+  notifyAdminConnected(): void {
+    this.socket.emit('admin-connected');
   }
 }

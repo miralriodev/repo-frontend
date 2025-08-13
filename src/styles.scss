@@ -19,4 +19,15 @@ body {
   /* Mantén tus estilos de Leaflet aquí */
 }
 
+/* Solución para los dropdowns de PrimeNG */
+.p-dropdown-panel {
+  overflow: visible !important;
+  z-index: 1003 !important; /* Asegura que esté por encima de los modales */
+}
+
+.p-dropdown-items-wrapper {
+  max-height: 200px !important; /* Altura máxima para la lista desplegable */
+  overflow-y: auto !important;
+}
+
 /* Ya no pongas ningún @import de node_modules */

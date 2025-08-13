@@ -31,16 +31,21 @@ export class PackageService {
     return this.http.get<Package[]>(url, { headers: this.getHeaders() });
   }
 
-  updatePackageStatus(packageId: number, status: 'en_transito' | 'entregado' | 'regresado'): Observable<Package> {
-    return this.http.put<Package>(`${this.apiUrl}/status`, 
-      { packageId, status },
-      { headers: this.getHeaders() }
-    );
-  }
-
   getAllPackages(): Observable<Package[]> {
     return this.http.get<Package[]>(`${this.apiUrl}/all`, 
       { headers: this.getHeaders() }
     );
+  }
+
+  createPackageNew(packageData: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}`, packageData, { headers: this.getHeaders() });
+  }
+
+  assignDeliveryToPackage(packageId: number, deliveryId: number): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${packageId}/assign`, { delivery_id: deliveryId }, { headers: this.getHeaders() });
+  }
+
+  updatePackageStatus(packageId: number, status: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${packageId}/status`, { status }, { headers: this.getHeaders() });
   }
 }

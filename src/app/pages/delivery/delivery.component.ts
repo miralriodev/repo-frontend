@@ -127,6 +127,11 @@ export class DeliveryComponent implements OnInit, OnDestroy {
     // Primero intentamos obtener la ubicación antes de inicializar el mapa
     this.tryGetInitialPosition();
     this.loadPackages();
+  
+    // Notificar al servidor que el delivery está activo al cargar la página
+    if (this.authService.currentUserValue && this.authService.isDelivery) {
+      this.socketService.notifyDeliveryLogin(this.authService.currentUserValue);
+    }
   }
 
   ngOnDestroy(): void {
