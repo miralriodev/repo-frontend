@@ -14,6 +14,8 @@ export class SocketService {
   private locationUpdated = new Subject<Location>();
   private packageUpdated = new Subject<Package>();
   private activeDeliveriesUpdated = new Subject<number[]>();
+  // Nuevo Subject para simulaciones de ruta
+  private routeSimulationUpdated = new Subject<any>();
 
   constructor() {
     this.socket = io(environment.socketUrl);
@@ -31,6 +33,11 @@ export class SocketService {
 
     this.socket.on('active-deliveries-updated', (activeDeliveryIds: number[]) => {
       this.activeDeliveriesUpdated.next(activeDeliveryIds);
+    });
+    
+    // Nuevo listener para simulaciones de ruta
+    this.socket.on('route-simulation-updated', (data: any) => {
+      this.routeSimulationUpdated.next(data);
     });
   }
 
@@ -75,5 +82,24 @@ export class SocketService {
   // Nuevo método para notificar que el admin se conectó
   notifyAdminConnected(): void {
     this.socket.emit('admin-connected');
+  }
+
+  // Nuevo método para emitir actualizaciones de simulación de ruta
+  emitRouteSimulation(data: {
+    deliveryId: number,
+    route: {lat: number, lng: number}[],
+    destination: {lat: number, lng: number},
+    address: string,
+    currentStep: number,
+    totalSteps: number,
+    status: 'start' | 'update' | 'complete',
+    packageId?: number // Añadir el ID del paquete como opcional
+  }): void {
+    this.socket.emit('route-simulation', data);
+  }
+  
+  // Nuevo método para suscribirse a actualizaciones de simulación
+  onRouteSimulationUpdated(): Observable<any> {
+    return this.routeSimulationUpdated.asObservable();
   }
 }

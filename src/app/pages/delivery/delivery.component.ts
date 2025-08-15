@@ -112,7 +112,12 @@ export class DeliveryComponent implements OnInit, OnDestroy {
   marker: L.Marker | null = null;
   currentPosition: { latitude: number, longitude: number } | null = null;
   private subscriptions: Subscription[] = [];
-  private defaultPosition = { latitude: 19.4326, longitude: -99.1332 }; // Ciudad de México como posición por defecto
+  private defaultPosition = { latitude: 19.4326, longitude: -99.1332 };
+
+  // Variables para manejar simulación
+  private routeLines: { [key: number]: L.Polyline } = {};
+  private destinationMarkers: { [key: number]: L.Marker } = {};
+  private simulationInProgress = false;
 
   constructor(
     private authService: AuthService,
@@ -132,6 +137,17 @@ export class DeliveryComponent implements OnInit, OnDestroy {
     if (this.authService.currentUserValue && this.authService.isDelivery) {
       this.socketService.notifyDeliveryLogin(this.authService.currentUserValue);
     }
+
+    // 🔧 CÓDIGO MOVIDO AQUÍ: Suscribirse a actualizaciones de simulación de ruta
+    this.subscriptions.push(
+      this.socketService.onRouteSimulationUpdated().subscribe(data => {
+        // Verificar que la simulación sea para este delivery
+        const currentUserId = this.authService.currentUserValue?.id;
+        if (data.deliveryId === currentUserId) {
+          this.handleRouteSimulation(data);
+        }
+      })
+    );
   }
 
   ngOnDestroy(): void {
@@ -161,10 +177,9 @@ export class DeliveryComponent implements OnInit, OnDestroy {
             detail: 'No se pudo obtener tu ubicación inicial. Usando ubicación por defecto.'
           });
         },
-        { timeout: 5000, enableHighAccuracy: true } // Timeout de 5 segundos para evitar esperas largas
+        { timeout: 5000, enableHighAccuracy: true }
       );
     } else {
-      // Si no hay geolocalización, inicializamos con la posición por defecto
       this.initMap(this.defaultPosition.latitude, this.defaultPosition.longitude);
       this.startLocationTracking();
       this.messageService.add({
@@ -185,7 +200,6 @@ export class DeliveryComponent implements OnInit, OnDestroy {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map);
     
-    // Crear el marcador inicial
     this.updateMapPosition(latitude, longitude);
   }
 
@@ -205,7 +219,6 @@ export class DeliveryComponent implements OnInit, OnDestroy {
   }
 
   startLocationTracking(): void {
-    // Actualizar la ubicación cada 10 segundos
     this.subscriptions.push(
       interval(10000).subscribe(() => {
         this.getCurrentPosition();
@@ -218,13 +231,10 @@ export class DeliveryComponent implements OnInit, OnDestroy {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          console.log('Coordenadas obtenidas:', { latitude, longitude }); // Agregar este log
+          console.log('Coordenadas obtenidas:', { latitude, longitude });
           this.currentPosition = { latitude, longitude };
           
-          // Actualizar el mapa
           this.updateMapPosition(latitude, longitude);
-          
-          // Enviar la ubicación al servidor
           this.sendLocationUpdate(latitude, longitude);
         },
         (error) => {
@@ -247,14 +257,11 @@ export class DeliveryComponent implements OnInit, OnDestroy {
   }
 
   updateMapPosition(latitude: number, longitude: number): void {
-    // Centrar el mapa en la posición actual
     this.map.setView([latitude, longitude], 15);
     
-    // Actualizar o crear el marcador
     if (this.marker) {
       this.marker.setLatLng([latitude, longitude]);
     } else {
-      // Crear un icono personalizado con emoji de moto
       const customIcon = L.divIcon({
         className: 'delivery-icon',
         html: '<div style="font-size: 30px; text-shadow: 0px 0px 3px white, 0px 0px 5px white;">🏍️</div>',
@@ -274,23 +281,18 @@ export class DeliveryComponent implements OnInit, OnDestroy {
     const userId = this.authService.currentUserValue?.id;
     if (!userId) return;
     
-    // Actualizar en la base de datos
     this.deliveryService.updateLocation(latitude, longitude).subscribe();
-    
-    // Emitir a través de socket.io
     this.socketService.updateLocation({ userId, latitude, longitude });
   }
 
   updatePackageStatus(packageId: number, status: 'en_transito' | 'entregado' | 'regresado'): void {
     this.packageService.updatePackageStatus(packageId, status).subscribe({
       next: (updatedPackage) => {
-        // Actualizar el paquete en la lista local
         const index = this.packages.findIndex(p => p.id === packageId);
         if (index !== -1) {
           this.packages[index].status = updatedPackage.status;
         }
         
-        // Emitir a través de socket.io
         this.socketService.updatePackageStatus({ packageId, status });
         
         this.messageService.add({
@@ -312,5 +314,132 @@ export class DeliveryComponent implements OnInit, OnDestroy {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  // 🔧 MÉTODOS MOVIDOS DENTRO DE LA CLASE:
+
+  // Manejar actualizaciones de simulación de ruta
+  private handleRouteSimulation(data: any): void {
+    const { route, destination, address, currentStep, totalSteps, status, packageId } = data;
+
+    // Si es inicio de simulación, crear línea de ruta y marcador de destino
+    if (status === 'start') {
+      // Limpiar simulaciones anteriores
+      this.clearSimulation();
+
+      // Marcar que hay una simulación en progreso
+      this.simulationInProgress = true;
+
+      // Crear línea de ruta
+      const routeLine = L.polyline(route.map((point: any) => [point.lat, point.lng]), {
+        color: '#ff6b35',
+        weight: 3,
+        opacity: 0.8,
+        dashArray: '8, 12'
+      }).addTo(this.map);
+
+      this.routeLines[1] = routeLine;
+
+      // Crear marcador de destino
+      const destinationIcon = L.divIcon({
+        html: `
+          <div style="
+            background-color: #FF4444;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 3px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+          ">
+            📍
+          </div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      });
+
+      this.destinationMarkers[1] = L.marker([destination.lat, destination.lng], {
+        icon: destinationIcon
+      })
+      .bindPopup(`<b>Destino:</b><br>${address}`)
+      .addTo(this.map);
+
+      // Centrar mapa para ver toda la ruta
+      this.map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+      this.messageService.add({
+        severity: 'info',
+        summary: '🚀 Simulación Iniciada',
+        detail: `En camino a ${address}`,
+        life: 3000
+      });
+    }
+    // Si es actualización, mover el marcador del delivery
+    else if (status === 'update' && this.simulationInProgress) {
+      const currentPosition = route[currentStep];
+
+      // Actualizar posición del marcador con transición suave
+      if (this.marker) {
+        // Agregar clase CSS para transición suave
+        const markerElement = this.marker.getElement();
+        if (markerElement) {
+          markerElement.style.transition = 'all 0.3s ease-out';
+        }
+
+        this.marker.setLatLng([currentPosition.lat, currentPosition.lng]);
+
+        // Actualizar popup con progreso
+        const progress = Math.round((currentStep / totalSteps) * 100);
+        this.marker.bindPopup(`
+          <div style="text-align: center;">
+            <b>🚚 En ruta</b><br>
+            <small>Destino: ${address}</small><br>
+            <div style="background: #e0e0e0; border-radius: 10px; padding: 2px; margin: 5px 0;">
+              <div style="background: #4caf50; height: 8px; border-radius: 8px; width: ${progress}%;"></div>
+            </div>
+            <small>${progress}% completado</small>
+          </div>
+        `);
+      }
+    }
+    // Si es finalización, limpiar la simulación y actualizar el estado del paquete
+    else if (status === 'complete') {
+      this.clearSimulation();
+
+      // Actualizar el estado del paquete a entregado si se proporciona el ID del paquete
+      if (packageId) {
+        this.updatePackageStatus(packageId, 'entregado');
+      }
+
+      this.messageService.add({
+        severity: 'success',
+        summary: '✅ Entrega Completada',
+        detail: `Paquete entregado en ${address}`,
+        life: 5000
+      });
+
+      // Recargar la lista de paquetes para mostrar el estado actualizado
+      this.loadPackages();
+    }
+  }
+
+  // Limpiar simulación
+  private clearSimulation(): void {
+    this.simulationInProgress = false;
+
+    // Limpiar línea de ruta
+    if (this.routeLines[1]) {
+      this.map.removeLayer(this.routeLines[1]);
+      delete this.routeLines[1];
+    }
+
+    // Limpiar marcador de destino
+    if (this.destinationMarkers[1]) {
+      this.map.removeLayer(this.destinationMarkers[1]);
+      delete this.destinationMarkers[1];
+    }
   }
 }

@@ -32,7 +32,10 @@
               }
             ],
             "styles": [
-  "src/styles.scss"
+  "src/styles.scss",
+  "node_modules/primeicons/primeicons.css",
+  "node_modules/primeflex/primeflex.css",
+  "node_modules/leaflet/dist/leaflet.css"
 ],
             "scripts": []
           },
@@ -41,8 +44,8 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumWarning": "1MB",
+                  "maximumError": "2MB"
                 },
                 {
                   "type": "anyComponentStyle",

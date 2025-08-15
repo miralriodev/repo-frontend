@@ -1085,7 +1085,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         // Geocodificar dirección y iniciar simulación
         this.geocodeAddress(pkg.delivery_address).then((coords) => {
           if (coords) {
-            this.startDeliverySimulation(pkg.delivery_id!, coords, pkg.delivery_address);
+            this.startDeliverySimulation(pkg.delivery_id!, coords, pkg.delivery_address, pkg.id);
             
             this.messageService.add({
               severity: 'info',
@@ -1099,7 +1099,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.messageService.add({
           severity: 'error',
           summary: 'Error',
-          detail: 'No se pudo iniciar la simulación'
+          detail: 'No se pudo actualizar el estado del paquete'
         });
       }
     });
@@ -1125,7 +1125,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   // Función principal para iniciar simulación de recorrido
-  private startDeliverySimulation(deliveryId: number, destination: {lat: number, lng: number}, address: string): void {
+  private startDeliverySimulation(deliveryId: number, destination: {lat: number, lng: number}, address: string, packageId: number): void {
     const currentLocation = this.locations.find(loc => loc.user_id === deliveryId);
     
     if (!currentLocation) {
@@ -1172,14 +1172,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     // Calcular ruta y iniciar animación
     this.calculateRoute(currentLocation, destination).then((route) => {
       if (route && route.length > 0) {
-        this.animateDeliveryRoute(deliveryId, route, destination, address);
+        this.animateDeliveryRoute(deliveryId, route, destination, address, packageId);
       } else {
         // Si no se puede calcular ruta, hacer línea recta
         const straightRoute = this.createSmoothStraightRoute(
           { lat: currentLocation.latitude, lng: currentLocation.longitude },
           destination
         );
-        this.animateDeliveryRoute(deliveryId, straightRoute, destination, address);
+        this.animateDeliveryRoute(deliveryId, straightRoute, destination, address, packageId);
       }
     });
   }
@@ -1260,7 +1260,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   // Animar el recorrido del delivery con movimiento más realista
-  private animateDeliveryRoute(deliveryId: number, route: {lat: number, lng: number}[], destination: {lat: number, lng: number}, address: string): void {
+  private animateDeliveryRoute(deliveryId: number, route: {lat: number, lng: number}[], destination: {lat: number, lng: number}, address: string, packageId: number): void {
     let currentStep = 0;
     const stepDuration = 200; // Más lento: 200ms por paso
     
@@ -1279,10 +1279,35 @@ export class AdminComponent implements OnInit, OnDestroy {
     // Cambiar estado del delivery a "en tránsito"
     this.updateDeliveryStatus(deliveryId, 'en_transito');
     
+    // Emitir evento de inicio de simulación
+    this.socketService.emitRouteSimulation({
+      deliveryId,
+      route,
+      destination,
+      address,
+      currentStep: 0,
+      totalSteps: route.length,
+      status: 'start',
+      packageId // Añadir el ID del paquete
+    });
+    
     const animate = () => {
       if (currentStep >= route.length) {
         console.log('🏁 Delivery llegó al destino');
-        this.onDeliveryArrived(deliveryId, destination, address);
+        
+        // Emitir evento de finalización de simulación
+        this.socketService.emitRouteSimulation({
+          deliveryId,
+          route,
+          destination,
+          address,
+          currentStep: route.length,
+          totalSteps: route.length,
+          status: 'complete',
+          packageId // Añadir el ID del paquete
+        });
+        
+        this.onDeliveryArrived(deliveryId, destination, address, packageId);
         return;
       }
       
@@ -1319,6 +1344,20 @@ export class AdminComponent implements OnInit, OnDestroy {
             <small>${progress}% completado</small>
           </div>
         `);
+        
+        // Emitir actualización de simulación cada 5 pasos para no saturar
+        if (currentStep % 5 === 0 || currentStep === route.length - 1) {
+          this.socketService.emitRouteSimulation({
+            deliveryId,
+            route,
+            destination,
+            address,
+            currentStep,
+            totalSteps: route.length,
+            status: 'update',
+            packageId // Añadir el ID del paquete
+          });
+        }
       }
       
       currentStep++;
@@ -1336,7 +1375,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   // Cuando el delivery llega al destino
-  private onDeliveryArrived(deliveryId: number, destination: {lat: number, lng: number}, address: string): void {
+  private onDeliveryArrived(deliveryId: number, destination: {lat: number, lng: number}, address: string, packageId: number): void {
     // Buscar el paquete correspondiente y actualizar su estado
     const packageToUpdate = this.packages.find(pkg => 
       pkg.delivery_id === deliveryId && 
@@ -1360,6 +1399,18 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.map.removeLayer(this.routeLines[deliveryId]);
       delete this.routeLines[deliveryId];
     }
+
+    // Emitir evento de finalización de simulación con el ID del paquete
+    this.socketService.emitRouteSimulation({
+      deliveryId,
+      route: [],
+      destination,
+      address,
+      currentStep: 0,
+      totalSteps: 0,
+      status: 'complete',
+      packageId // Añadir el ID del paquete
+    });
 
     // Remover marcador de destino después de un tiempo
     setTimeout(() => {
