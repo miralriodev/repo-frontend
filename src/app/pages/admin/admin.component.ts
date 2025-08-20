@@ -1,29 +1,28 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { ButtonModule } from 'primeng/button';
-import { TableModule } from 'primeng/table';
-import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { DropdownModule } from 'primeng/dropdown';
-import { ToastModule } from 'primeng/toast';
-import { MessageService } from 'primeng/api';
-import { TooltipModule } from 'primeng/tooltip';
-import { AutoCompleteModule } from 'primeng/autocomplete';
-import { Subscription, interval } from 'rxjs';
 import * as L from 'leaflet';
-import { HttpClient } from '@angular/common/http';
+import { MessageService } from 'primeng/api';
+import { AutoCompleteModule } from 'primeng/autocomplete';
+import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
+import { DropdownModule } from 'primeng/dropdown';
+import { InputTextModule } from 'primeng/inputtext';
+import { TableModule } from 'primeng/table';
+import { ToastModule } from 'primeng/toast';
+import { TooltipModule } from 'primeng/tooltip';
+import { Subscription, interval, lastValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { lastValueFrom } from 'rxjs';
 
+import { Location } from '../../interfaces/location.interface';
+import { Package } from '../../interfaces/package.interface';
+import { User } from '../../interfaces/user.interface';
 import { AuthService } from '../../services/auth.service';
 import { DeliveryService } from '../../services/delivery.service';
 import { PackageService } from '../../services/package.service';
 import { SocketService } from '../../services/socket.service';
-import { User } from '../../interfaces/user.interface';
-import { Package } from '../../interfaces/package.interface';
-import { Location } from '../../interfaces/location.interface';
 
 @Component({
   selector: 'app-admin',
@@ -41,118 +40,654 @@ import { Location } from '../../interfaces/location.interface';
     AutoCompleteModule
   ],
   providers: [MessageService],
-  template: `
-    <div class="grid">
-      <div class="col-12">
-        <div class="flex justify-content-between align-items-center mb-3">
-          <div>
-            <h1>Panel de Administración</h1>
-            <small *ngIf="locationDetected" class="text-500">
-              📍 Zona de cobertura: {{userCity}}, {{userCountry}}
-            </small>
-          </div>
-          <p-button icon="pi pi-sign-out" label="Cerrar Sesión" (onClick)="logout()"></p-button>
-        </div>
-      </div>
+  styles: [`
+    :host {
+      display: block;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* Modal principal con overflow controlado */
+    ::ng-deep .p-dialog {
+      overflow: visible !important;
+    }
+    
+    ::ng-deep .p-dialog-content {
+      padding: 1.5rem !important;
+      position: relative !important;
+      overflow: visible !important;
+      max-height: 80vh !important;
+    }
+    
+    /* Contenedor del formulario con scroll interno */
+    ::ng-deep .p-dialog .flex.flex-column.gap-3 {
+      position: relative !important;
+      overflow-y: auto !important;
+      max-height: calc(80vh - 3rem) !important;
+      padding-right: 10px !important;
+    }
+    
+    .admin-dashboard {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background-color: var(--surface-ground);
+    }
+    
+    /* Header styles */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1.5rem;
+      background-color: var(--surface-card);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      z-index: 10;
+    }
+    
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .logo-section i {
+      font-size: 1.5rem;
+      color: var(--primary-color);
+    }
+    
+    .logo-section h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text-color);
+    }
+    
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .location-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--text-color-secondary);
+    }
+    
+    .theme-toggle {
+      background: none;
+      border: none;
+      color: var(--text-color-secondary);
+      cursor: pointer;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .theme-toggle:hover {
+      background-color: var(--surface-hover);
+    }
+    
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 2rem;
+    }
+    
+    .user-profile:hover {
+      background-color: var(--surface-hover);
+    }
+    
+    /* Dashboard content */
+    .dashboard-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      width: 250px;
+      background-color: var(--surface-card);
+      padding: 1.5rem 0;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.03);
+      overflow-y: auto;
+    }
+    
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      color: var(--text-color-secondary);
+      transition: all 0.2s ease;
+    }
+    
+    .menu-item:hover {
+      background-color: var(--surface-hover);
+      color: var(--text-color);
+    }
+    
+    .menu-item.active {
+      background-color: var(--primary-50);
+      color: var(--primary-color);
+      border-left: 3px solid var(--primary-color);
+    }
+    
+    .menu-item i {
+      font-size: 1.25rem;
+    }
+    
+    /* Main content */
+    .main-content {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    /* Summary cards */
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+    }
+    
+    .summary-card {
+      background-color: var(--surface-card);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .card-icon i {
+      font-size: 1.5rem;
+      color: white;
+    }
+    
+    .card-icon.blue {
+      background-color: #3B82F6;
+    }
+    
+    .card-icon.green {
+      background-color: #10B981;
+    }
+    
+    .card-icon.orange {
+      background-color: #F59E0B;
+    }
+    
+    .card-icon.purple {
+      background-color: #8B5CF6;
+    }
+    
+    .card-content h3 {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-color-secondary);
+      margin: 0 0 0.25rem 0;
+    }
+    
+    .card-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-color);
+      margin: 0;
+    }
+    
+    /* Map section */
+    .map-section {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+    }
+    
+    .map-container, .deliveries-list {
+      background-color: var(--surface-card);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--surface-border);
+    }
+    
+    .section-header h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text-color);
+    }
+    
+    .map-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    #map {
+      height: 400px;
+    }
+    
+    /* Deliveries list */
+    .delivery-items {
+      padding: 1rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .delivery-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      background-color: var(--surface-section);
+      transition: all 0.2s ease;
+    }
+    
+    .delivery-item:hover {
+      background-color: var(--surface-hover);
+    }
+    
+    .delivery-item.active {
+      border-left: 3px solid #10B981;
+    }
+    
+    .delivery-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--surface-hover);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .delivery-avatar i {
+      color: var(--text-color-secondary);
+    }
+    
+    .delivery-info h4 {
+      margin: 0 0 0.25rem 0;
+      font-size: 0.9375rem;
+      font-weight: 500;
+    }
+    
+    .delivery-status {
+      font-size: 0.75rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+    }
+    
+    .status-active {
+      background-color: #10B981;
+      color: white;
+    }
+    
+    .status-inactive {
+      background-color: var(--surface-hover);
+      color: var(--text-color-secondary);
+    }
+    
+    /* Packages section */
+    .packages-section {
+      background-color: var(--surface-card);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    
+    .packages-table {
+      width: 100%;
+    }
+    
+    .package-id {
+      font-weight: 600;
+      color: var(--primary-color);
+    }
+    
+    .delivery-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: inline-block;
+      text-transform: capitalize;
+    }
+    
+    .status-assigned {
+      background-color: #3B82F6;
+      color: white;
+    }
+    
+    .status-transit {
+      background-color: #F59E0B;
+      color: white;
+    }
+    
+    .status-delivered {
+      background-color: #10B981;
+      color: white;
+    }
+    
+    .status-returned {
+      background-color: #EF4444;
+      color: white;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    
+    /* Responsive adjustments */
+    @media screen and (max-width: 992px) {
+      .map-section {
+        grid-template-columns: 1fr;
+      }
       
-      <div class="col-12 md:col-8">
-        <div class="card" style="height: 500px;">
-          <div class="flex justify-content-between align-items-center">
-            <h2>Mapa de Deliveries</h2>
-            <div class="flex gap-2">
-              <p-button icon="pi pi-map-marker" label="Mi Ubicación" (onClick)="getCurrentPosition()"></p-button>
-              <p-button icon="pi pi-users" label="Ver Todos" (onClick)="showAllDeliveryLocations()"></p-button>
+      .sidebar {
+        width: 64px;
+      }
+      
+      .menu-item span {
+        display: none;
+      }
+      
+      .menu-item {
+        justify-content: center;
+        padding: 0.75rem;
+      }
+    }
+    
+    @media screen and (max-width: 768px) {
+      .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    
+    @media screen and (max-width: 576px) {
+      .summary-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Estilos para el botón flotante */
+    .floating-action-button {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 4rem;
+      height: 4rem;
+      z-index: 1000;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .floating-action-button .p-button-icon {
+      font-size: 1.5rem;
+    }
+  `],
+  template: `
+    <div class="admin-dashboard">
+      <!-- Header con navegación y perfil -->
+      <header class="dashboard-header">
+        <div class="logo-section">
+          <i class="pi pi-truck"></i>
+          <h1>LogiTrack</h1>
+        </div>
+        
+        <div class="header-controls">
+          <div class="location-info" *ngIf="locationDetected">
+            <i class="pi pi-map-marker"></i>
+            <span>{{userCity}}, {{userCountry}}</span>
+          </div>
+          
+          <button class="theme-toggle" (click)="toggleTheme()">
+            <i class="pi pi-moon"></i>
+          </button>
+          
+          <div class="user-profile" (click)="toggleProfileMenu()">
+            <span>Admin</span>
+            <i class="pi pi-user"></i>
+          </div>
+          
+          <p-button icon="pi pi-sign-out" styleClass="p-button-text p-button-rounded" pTooltip="Cerrar Sesión" tooltipPosition="bottom" (onClick)="logout()"></p-button>
+        </div>
+      </header>
+      
+      <!-- Contenido principal -->
+      <div class="dashboard-content">
+        <!-- Panel lateral izquierdo -->
+        <aside class="sidebar">
+          <div class="menu-item active">
+            <i class="pi pi-home"></i>
+            <span>Panel Principal</span>
+          </div>
+          <div class="menu-item">
+            <i class="pi pi-box"></i>
+            <span>Gestión de Paquetes</span>
+          </div>
+          <div class="menu-item">
+            <i class="pi pi-users"></i>
+            <span>Repartidores</span>
+          </div>
+          <div class="menu-item">
+            <i class="pi pi-chart-bar"></i>
+            <span>Estadísticas</span>
+          </div>
+          <div class="menu-item">
+            <i class="pi pi-cog"></i>
+            <span>Configuración</span>
+          </div>
+        </aside>
+        
+        <!-- Área principal de contenido -->
+        <main class="main-content">
+          <!-- Tarjetas de resumen -->
+          <div class="summary-cards">
+            <div class="summary-card">
+              <div class="card-icon blue">
+                <i class="pi pi-box"></i>
+              </div>
+              <div class="card-content">
+                <h3>Total Paquetes</h3>
+                <p class="card-value">{{packages.length}}</p>
+              </div>
+            </div>
+            
+            <div class="summary-card">
+              <div class="card-icon green">
+                <i class="pi pi-check-circle"></i>
+              </div>
+              <div class="card-content">
+                <h3>Entregados</h3>
+                <p class="card-value">{{getPackageCountByStatus('entregado')}}</p>
+              </div>
+            </div>
+            
+            <div class="summary-card">
+              <div class="card-icon orange">
+                <i class="pi pi-sync"></i>
+              </div>
+              <div class="card-content">
+                <h3>En Tránsito</h3>
+                <p class="card-value">{{getPackageCountByStatus('en_transito')}}</p>
+              </div>
+            </div>
+            
+            <div class="summary-card">
+              <div class="card-icon purple">
+                <i class="pi pi-users"></i>
+              </div>
+              <div class="card-content">
+                <h3>Repartidores</h3>
+                <p class="card-value">{{deliveries.length}}</p>
+              </div>
             </div>
           </div>
-          <div id="map" style="height: 400px;"></div>
-        </div>
-      </div>
-      
-      <div class="col-12 md:col-4">
-        <div class="card">
-          <h2>Deliveries</h2>
-          <p-table [value]="deliveries" styleClass="p-datatable-sm">
-            <ng-template pTemplate="header">
-              <tr>
-                <th>Usuario</th>
-                <th>Estado</th>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-delivery>
-              <tr>
-                <td>{{ delivery?.username || 'Delivery #' + delivery?.id || 'Cargando...' }}</td>
-                <td>
-                  <span [ngClass]="{
-                    'bg-green-500': isDeliveryActive(delivery?.id),
-                    'bg-gray-500': !isDeliveryActive(delivery?.id)
-                  }" class="text-white px-2 py-1 border-round">
-                    {{ isDeliveryActive(delivery?.id) ? 'Activo' : 'Inactivo' }}
-                  </span>
-                </td>
-              </tr>
-            </ng-template>
-          </p-table>
-        </div>
-      </div>
-      
-      <div class="col-12">
-        <div class="card">
-          <div class="flex justify-content-between align-items-center mb-3">
-            <h2>Paquetes</h2>
-            <p-button icon="pi pi-plus" label="Nuevo Paquete" (onClick)="openNewPackageDialog()"></p-button>
-          </div>
-          <p-table [value]="packages" styleClass="p-datatable-sm">
-            <ng-template pTemplate="header">
-              <tr>
-                <th>ID</th>
-                <th>Destinatario</th>
-                <th>Dirección</th>
-                <th>Delivery</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-pkg>
-              <tr>
-                <td>{{ pkg.id }}</td>
-                <td>{{ pkg.recipient_name }}</td>
-                <td>{{ pkg.delivery_address }}</td>
-                <td>{{ pkg.delivery_name || 'Sin asignar' }}</td>
-                <td>
-                  <span [ngClass]="{
-                    'bg-blue-500': pkg.status === 'asignado',
-                    'bg-orange-500': pkg.status === 'en_transito',
-                    'bg-green-500': pkg.status === 'entregado',
-                    'bg-red-500': pkg.status === 'regresado'
-                  }" class="text-white px-2 py-1 border-round">
-                    {{ getStatusLabel(pkg.status) }}
-                  </span>
-                </td>
-                <td>
-                  <div class="flex gap-2">
-                    <!-- Botón Simular entrega -->
-                    <p-button 
-                      *ngIf="pkg.status === 'asignado' && pkg.delivery_id" 
-                      icon="pi pi-play" 
-                      styleClass="p-button-sm p-button-success" 
-                      pTooltip="Simular entrega"
-                      (onClick)="simulateDelivery(pkg)"></p-button>
-                    
-                    <!-- Botón Asignar delivery -->
-                    <p-button 
-                      *ngIf="!pkg.delivery_id && pkg.status !== 'entregado'" 
-                      icon="pi pi-user-plus" 
-                      styleClass="p-button-sm p-button-info" 
-                      pTooltip="Asignar delivery"
-                      (onClick)="openAssignDeliveryDialog(pkg)"></p-button>
+          
+          <!-- Mapa y lista de repartidores -->
+          <div class="map-section">
+            <div class="map-container">
+              <div class="section-header">
+                <h2>Monitoreo en Tiempo Real</h2>
+                <div class="map-controls">
+                  <p-button icon="pi pi-map-marker" styleClass="p-button-sm p-button-outlined" pTooltip="Mi Ubicación" tooltipPosition="bottom" (onClick)="getCurrentPosition()"></p-button>
+                  <p-button icon="pi pi-users" styleClass="p-button-sm p-button-outlined" pTooltip="Ver Todos" tooltipPosition="bottom" (onClick)="showAllDeliveryLocations()"></p-button>
+                </div>
+              </div>
+              <div id="map"></div>
+            </div>
+            
+            <div class="deliveries-list">
+              <div class="section-header">
+                <h2>Repartidores Activos</h2>
+              </div>
+              <div class="delivery-items">
+                <div *ngFor="let delivery of deliveries" class="delivery-item" [ngClass]="{'active': isDeliveryActive(delivery?.id)}">
+                  <div class="delivery-avatar">
+                    <i class="pi pi-user"></i>
                   </div>
-                </td>
-              </tr>
-            </ng-template>
-          </p-table>
-        </div>
+                  <div class="delivery-info">
+                    <h4>{{ delivery?.username || 'Repartidor #' + delivery?.id }}</h4>
+                    <span class="delivery-status" [ngClass]="isDeliveryActive(delivery?.id) ? 'status-active' : 'status-inactive'">
+                      {{ isDeliveryActive(delivery?.id) ? 'En servicio' : 'Fuera de servicio' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tabla de paquetes - Siempre visible -->
+          <div class="packages-section">
+            <div class="section-header">
+              <h2>Gestión de Paquetes</h2>
+              <p-button icon="pi pi-plus" label="Nuevo Envío" styleClass="p-button-sm" (onClick)="openNewPackageDialog()"></p-button>
+            </div>
+            
+            <p-table [value]="packages" styleClass="packages-table" [paginator]="true" [rows]="5" [rowsPerPageOptions]="[5,10,25]" [showCurrentPageReport]="true">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>ID</th>
+                  <th>Destinatario</th>
+                  <th>Dirección de Entrega</th>
+                  <th>Repartidor Asignado</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-pkg>
+                <tr>
+                  <td><span class="package-id">#{{pkg.id}}</span></td>
+                  <td>{{pkg.recipient_name}}</td>
+                  <td>{{pkg.delivery_address}}</td>
+                  <td>
+                    <div class="delivery-cell">
+                      <i *ngIf="!pkg.delivery_id" class="pi pi-user-minus"></i>
+                      <i *ngIf="pkg.delivery_id" class="pi pi-user"></i>
+                      <span>{{pkg.delivery_name || 'Sin asignar'}}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="status-badge" [ngClass]="{
+                      'status-assigned': pkg.status === 'asignado',
+                      'status-transit': pkg.status === 'en_transito',
+                      'status-delivered': pkg.status === 'entregado',
+                      'status-returned': pkg.status === 'regresado'
+                    }">
+                      {{ getStatusLabel(pkg.status) }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-buttons">
+                      <p-button 
+                        *ngIf="pkg.status === 'asignado' && pkg.delivery_id" 
+                        icon="pi pi-play" 
+                        styleClass="p-button-rounded p-button-sm p-button-success" 
+                        pTooltip="Iniciar simulación de entrega" 
+                        tooltipPosition="left"
+                        (onClick)="simulateDelivery(pkg)"></p-button>
+                      
+                      <p-button 
+                        *ngIf="!pkg.delivery_id && pkg.status !== 'entregado'" 
+                        icon="pi pi-user-plus" 
+                        styleClass="p-button-rounded p-button-sm p-button-info" 
+                        pTooltip="Asignar repartidor" 
+                        tooltipPosition="left"
+                        (onClick)="openAssignDeliveryDialog(pkg)"></p-button>
+                        
+                      <p-button 
+                        icon="pi pi-eye" 
+                        styleClass="p-button-rounded p-button-sm p-button-outlined" 
+                        pTooltip="Ver detalles" 
+                        tooltipPosition="left"></p-button>
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="6" class="text-center p-4">
+                    <div class="flex flex-column align-items-center">
+                      <i class="pi pi-inbox text-muted" style="font-size: 3rem"></i>
+                      <p class="mt-3 mb-0">No hay paquetes disponibles</p>
+                      <p-button label="Crear Nuevo Paquete" icon="pi pi-plus" styleClass="p-button-sm mt-3" (onClick)="openNewPackageDialog()"></p-button>
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+        </main>
       </div>
     </div>
+    
+    <!-- Botón flotante para crear paquete -->
+    <button pButton 
+      class="p-button-rounded p-button-lg floating-action-button" 
+      icon="pi pi-plus" 
+      (click)="openNewPackageDialog()" 
+      pTooltip="Nuevo Envío" 
+      tooltipPosition="left">
+    </button>
     
     <!-- Modal Nuevo Paquete -->
     <p-dialog header="Nuevo Paquete" [(visible)]="showNewPackageDialog" [style]="{width: '600px', minHeight: '400px'}">
@@ -184,7 +719,7 @@ import { Location } from '../../interfaces/location.interface';
               </div>
             </div>
           </div>
-          <small class="text-500" *ngIf="locationDetected">
+          <small class="text-500" *ngIf="locationDetected && userCity && userCountry">
             Solo se permiten direcciones en {{userCity}}, {{userCountry}}
           </small>
           <small class="text-500" *ngIf="!locationDetected">
@@ -234,33 +769,7 @@ import { Location } from '../../interfaces/location.interface';
     </p-dialog>
     
     <p-toast></p-toast>
-  `,
-  styles: [`
-    :host {
-      display: block;
-      padding: 1rem;
-    }
-    
-    /* Modal principal con overflow controlado */
-    ::ng-deep .p-dialog {
-      overflow: visible !important;
-    }
-    
-    ::ng-deep .p-dialog-content {
-      padding: 1.5rem !important;
-      position: relative !important;
-      overflow: visible !important;
-      max-height: 80vh !important;
-    }
-    
-    /* Contenedor del formulario con scroll interno */
-    ::ng-deep .p-dialog .flex.flex-column.gap-3 {
-      position: relative !important;
-      overflow-y: auto !important;
-      max-height: calc(80vh - 3rem) !important;
-      padding-right: 10px !important;
-    }
-  `]
+  `
 })
 export class AdminComponent implements OnInit, OnDestroy {
   deliveries: User[] = [];
@@ -441,7 +950,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   // Verificar si un delivery está activo (tiene sesión)
-  isDeliveryActive(deliveryId: number): boolean {
+  isDeliveryActive(deliveryId: number | undefined): boolean {
+    if (deliveryId === undefined) return false;
     return this.activeDeliveryIds.includes(deliveryId);
   }
   
@@ -733,45 +1243,45 @@ export class AdminComponent implements OnInit, OnDestroy {
     
     const motoColor = motoColors[(user_id - 1) % motoColors.length];
     
-    // Crear icono simple con emoji de moto
+    // Crear icono simple para el delivery (camioneta)
     const customIcon = L.divIcon({
       html: `
         <div style="
           background-color: ${motoColor};
           border-radius: 50%;
-          width: 35px;
-          height: 35px;
+          width: 25px;
+          height: 25px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 18px;
-          border: 3px solid white;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          font-size: 12px;
+          border: 1px solid white;
+          box-shadow: none;
           position: relative;
         ">
-          🏍️
+          🚚
           <div style="
             position: absolute;
-            top: -8px;
-            right: -8px;
+            top: -3px;
+            right: -3px;
             background: white;
             color: ${motoColor};
             border-radius: 50%;
-            width: 18px;
-            height: 18px;
+            width: 12px;
+            height: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 8px;
             font-weight: bold;
-            border: 2px solid white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            border: 1px solid white;
+            box-shadow: none;
           ">${user_id}</div>
         </div>
       `,
-      iconSize: [35, 35],
-      iconAnchor: [17, 17],
-      popupAnchor: [0, -17]
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -15]
     });
     
     try {
@@ -817,6 +1327,27 @@ export class AdminComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+  
+  // Método para alternar entre tema claro y oscuro
+  toggleTheme(): void {
+    const body = document.body;
+    if (body.classList.contains('dark-theme')) {
+      body.classList.remove('dark-theme');
+      localStorage.setItem('theme', 'light');
+    } else {
+      body.classList.add('dark-theme');
+      localStorage.setItem('theme', 'dark');
+    }
+  }
+  
+  // Método para mostrar/ocultar el menú de perfil
+  toggleProfileMenu(): void {
+    // Implementación básica - en una versión más completa se podría usar un servicio o estado
+    const profileMenu = document.querySelector('.profile-menu');
+    if (profileMenu) {
+      profileMenu.classList.toggle('show');
+    }
   }
 
   private adjustMapView(): void {
@@ -942,6 +1473,12 @@ export class AdminComponent implements OnInit, OnDestroy {
       'regresado': 'Regresado'
     };
     return statusLabels[status] || status;
+  }
+  
+  // Contar paquetes por estado
+  getPackageCountByStatus(status: string): number {
+    if (!this.packages) return 0;
+    return this.packages.filter(pkg => pkg.status === status).length;
   }
   
   // Abrir modal para crear nuevo paquete
@@ -1145,22 +1682,21 @@ export class AdminComponent implements OnInit, OnDestroy {
     
     const destinationIcon = L.divIcon({
       html: `
-        <div style="
-          background-color: #FF4444;
-          width: 30px;
-          height: 30px;
+0        <div style="
+          background-color: #777777;
+          width: 10px;
+          height: 10px;
           border-radius: 50%;
-          border: 3px solid white;
+          border: none;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+          box-shadow: none;
         ">
-          📍
         </div>
       `,
-      iconSize: [30, 30],
-      iconAnchor: [15, 30]
+      iconSize: [10, 10],
+      iconAnchor: [5, 5]
     });
 
     this.destinationMarkers[key] = L.marker([destination.lat, destination.lng], {
@@ -1259,19 +1795,19 @@ export class AdminComponent implements OnInit, OnDestroy {
     return route;
   }
 
-  // Animar el recorrido del delivery con movimiento más realista
+  // Animar el recorrido del delivery con estilo ultra minimalista
   private animateDeliveryRoute(deliveryId: number, route: {lat: number, lng: number}[], destination: {lat: number, lng: number}, address: string, packageId: number): void {
     let currentStep = 0;
-    const stepDuration = 200; // Más lento: 200ms por paso
+    const stepDuration = 250; // Más lento: 250ms por paso
     
     console.log('🎬 Iniciando animación con', route.length, 'pasos');
     
-    // Crear línea de ruta
+    // Crear línea de ruta - estilo ultra minimalista
     const routeLine = L.polyline(route.map(point => [point.lat, point.lng]), {
-      color: '#ff6b35',
-      weight: 3,
-      opacity: 0.8,
-      dashArray: '8, 12'
+      color: '#555555',
+      weight: 1,
+      opacity: 0.4,
+      dashArray: '2, 6'
     }).addTo(this.map);
     
     this.routeLines[deliveryId] = routeLine;
@@ -1332,16 +1868,11 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.locations[locationIndex].longitude = currentPosition.lng;
         }
         
-        // Actualizar popup con progreso
+        // Actualizar popup con progreso - versión ultra minimalista
         const progress = Math.round((currentStep / route.length) * 100);
         marker.bindPopup(`
           <div style="text-align: center;">
-            <b>🚚 Delivery en ruta</b><br>
-            <small>Destino: ${address}</small><br>
-            <div style="background: #e0e0e0; border-radius: 10px; padding: 2px; margin: 5px 0;">
-              <div style="background: #4caf50; height: 8px; border-radius: 8px; width: ${progress}%;"></div>
-            </div>
-            <small>${progress}% completado</small>
+            <b>${progress}%</b>
           </div>
         `);
         

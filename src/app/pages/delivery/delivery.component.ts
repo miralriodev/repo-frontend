@@ -25,67 +25,89 @@ import { Package } from '../../interfaces/package.interface';
   ],
   providers: [MessageService],
   template: `
-    <div class="grid">
-      <div class="col-12">
-        <div class="flex justify-content-between align-items-center mb-3">
-          <h1>Panel de Delivery</h1>
-          <p-button icon="pi pi-sign-out" label="Cerrar Sesión" (onClick)="logout()"></p-button>
+    <div class="delivery-container">
+      <header class="header-bar">
+        <div class="flex justify-content-between align-items-center">
+          <h1 class="app-title">Sistema de Seguimiento</h1>
+          <p-button icon="pi pi-sign-out" label="Cerrar Sesión" styleClass="p-button-outlined" (onClick)="logout()"></p-button>
         </div>
-      </div>
+      </header>
       
-      <div class="col-12">
-        <div class="card" style="height: 400px;">
-          <h2>Mi Ubicación</h2>
-          <div id="map" style="height: 300px;"></div>
-          <div class="mt-2">
-            <p-button icon="pi pi-map-marker" label="Actualizar Ubicación" (onClick)="getCurrentPosition()"></p-button>
+      <div class="grid">
+        <div class="col-12 lg:col-8">
+          <div class="map-card">
+            <div class="card-header">
+              <h2>Mi Ubicación en Tiempo Real</h2>
+              <p-button icon="pi pi-map-marker" label="Actualizar" styleClass="p-button-sm p-button-outlined" (onClick)="getCurrentPosition()"></p-button>
+            </div>
+            <div id="map" class="map-container"></div>
           </div>
         </div>
-      </div>
-      
-      <div class="col-12">
-        <div class="card">
-          <h2>Mis Paquetes</h2>
-          <p-table [value]="packages" styleClass="p-datatable-sm">
-            <ng-template pTemplate="header">
-              <tr>
-                <th>ID</th>
-                <th>Dirección</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-pkg>
-              <tr>
-                <td>{{ pkg.id }}</td>
-                <td>{{ pkg.delivery_address }}</td>
-                <td>
-                  <span [ngClass]="{
-                    'bg-blue-500': pkg.status === 'asignado',
-                    'bg-orange-500': pkg.status === 'en_transito',
-                    'bg-green-500': pkg.status === 'entregado',
-                    'bg-red-500': pkg.status === 'regresado'
-                  }" class="text-white px-2 py-1 border-round">
-                    {{ pkg.status }}
-                  </span>
-                </td>
-                <td>
-                  <p-button *ngIf="pkg.status === 'asignado'" 
-                    label="En Tránsito" 
-                    styleClass="p-button-warning p-button-sm mr-2"
-                    (onClick)="updatePackageStatus(pkg.id, 'en_transito')"></p-button>
-                  <p-button *ngIf="pkg.status === 'en_transito'" 
-                    label="Entregado" 
-                    styleClass="p-button-success p-button-sm mr-2"
-                    (onClick)="updatePackageStatus(pkg.id, 'entregado')"></p-button>
-                  <p-button *ngIf="pkg.status === 'en_transito'" 
-                    label="Regresado" 
-                    styleClass="p-button-danger p-button-sm"
-                    (onClick)="updatePackageStatus(pkg.id, 'regresado')"></p-button>
-                </td>
-              </tr>
-            </ng-template>
-          </p-table>
+        
+        <div class="col-12 lg:col-4">
+          <div class="card status-card">
+            <h2>Estado de Entregas</h2>
+            <div class="status-summary">
+              <div class="status-item">
+                <span class="status-count">{{getPackageCountByStatus('asignado')}}</span>
+                <span class="status-label">Asignados</span>
+              </div>
+              <div class="status-item">
+                <span class="status-count">{{getPackageCountByStatus('en_transito')}}</span>
+                <span class="status-label">En Tránsito</span>
+              </div>
+              <div class="status-item">
+                <span class="status-count">{{getPackageCountByStatus('entregado')}}</span>
+                <span class="status-label">Entregados</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-12">
+          <div class="card">
+            <h2>Mis Paquetes</h2>
+            <p-table [value]="packages" styleClass="p-datatable-sm p-datatable-striped">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th>ID</th>
+                  <th>Dirección</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-pkg>
+                <tr>
+                  <td>{{ pkg.id }}</td>
+                  <td>{{ pkg.delivery_address }}</td>
+                  <td>
+                    <span [ngClass]="{
+                      'status-badge status-assigned': pkg.status === 'asignado',
+                      'status-badge status-transit': pkg.status === 'en_transito',
+                      'status-badge status-delivered': pkg.status === 'entregado',
+                      'status-badge status-returned': pkg.status === 'regresado'
+                    }">
+                      {{ pkg.status }}
+                    </span>
+                  </td>
+                  <td>
+                    <p-button *ngIf="pkg.status === 'asignado'" 
+                      label="En Tránsito" 
+                      styleClass="p-button-warning p-button-sm mr-2"
+                      (onClick)="updatePackageStatus(pkg.id, 'en_transito')"></p-button>
+                    <p-button *ngIf="pkg.status === 'en_transito'" 
+                      label="Entregado" 
+                      styleClass="p-button-success p-button-sm mr-2"
+                      (onClick)="updatePackageStatus(pkg.id, 'entregado')"></p-button>
+                    <p-button *ngIf="pkg.status === 'en_transito'" 
+                      label="Regresado" 
+                      styleClass="p-button-danger p-button-sm"
+                      (onClick)="updatePackageStatus(pkg.id, 'regresado')"></p-button>
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
         </div>
       </div>
     </div>
@@ -95,7 +117,117 @@ import { Package } from '../../interfaces/package.interface';
   styles: [`
     :host {
       display: block;
+    }
+    
+    .delivery-container {
+      min-height: 100vh;
+      background-color: var(--surface-ground);
+    }
+    
+    .header-bar {
+      background-color: var(--surface-card);
+      padding: 1rem 2rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+    }
+    
+    .app-title {
+      color: var(--primary-color);
+      margin: 0;
+      font-weight: 600;
+    }
+    
+    .card {
+      background-color: var(--surface-card);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .map-card {
+      background-color: var(--surface-card);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--surface-border);
+    }
+    
+    .card-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    
+    .map-container {
+      height: 450px;
+    }
+    
+    .status-card {
+      height: 100%;
+    }
+    
+    .status-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .status-item {
+      display: flex;
+      flex-direction: column;
       padding: 1rem;
+      border-radius: 8px;
+      background-color: rgba(59, 130, 246, 0.05);
+    }
+    
+    .status-count {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+    
+    .status-label {
+      font-size: 0.875rem;
+      color: var(--text-color-secondary);
+    }
+    
+    .status-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: inline-block;
+      text-transform: capitalize;
+    }
+    
+    .status-assigned {
+      background-color: #3B82F6;
+      color: white;
+    }
+    
+    .status-transit {
+      background-color: #F59E0B;
+      color: white;
+    }
+    
+    .status-delivered {
+      background-color: #10B981;
+      color: white;
+    }
+    
+    .status-returned {
+      background-color: #EF4444;
+      color: white;
     }
     
     .delivery-icon {
@@ -155,6 +287,10 @@ export class DeliveryComponent implements OnInit, OnDestroy {
     if (this.map) {
       this.map.remove();
     }
+  }
+  
+  getPackageCountByStatus(status: string): number {
+    return this.packages.filter(pkg => pkg.status === status).length;
   }
 
   tryGetInitialPosition(): void {
@@ -264,7 +400,7 @@ export class DeliveryComponent implements OnInit, OnDestroy {
     } else {
       const customIcon = L.divIcon({
         className: 'delivery-icon',
-        html: '<div style="font-size: 30px; text-shadow: 0px 0px 3px white, 0px 0px 5px white;">🏍️</div>',
+        html: '<div style="font-size: 30px; text-shadow: 0px 0px 3px white, 0px 0px 5px white;">🛻</div>',
         iconSize: [30, 30],
         iconAnchor: [15, 15]
       });
@@ -395,11 +531,8 @@ export class DeliveryComponent implements OnInit, OnDestroy {
         const progress = Math.round((currentStep / totalSteps) * 100);
         this.marker.bindPopup(`
           <div style="text-align: center;">
-            <b>🚚 En ruta</b><br>
             <small>Destino: ${address}</small><br>
-            <div style="background: #e0e0e0; border-radius: 10px; padding: 2px; margin: 5px 0;">
-              <div style="background: #4caf50; height: 8px; border-radius: 8px; width: ${progress}%;"></div>
-            </div>
+           
             <small>${progress}% completado</small>
           </div>
         `);

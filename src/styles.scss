@@ -5,7 +5,14 @@
 
 /* Configuración de la tipografía */
 :root {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Inter', sans-serif;
+  --primary-color: #3B82F6;
+  --secondary-color: #10B981;
+  --surface-ground: #F8FAFC;
+  --surface-card: #FFFFFF;
+  --surface-border: #E2E8F0;
+  --text-color: #334155;
+  --text-color-secondary: #64748B;
 }
 
 body {
@@ -13,10 +20,14 @@ body {
   padding: 0;
   height: 100vh;
   overflow-x: hidden;
+  background-color: var(--surface-ground);
+  color: var(--text-color);
 }
 
 .leaflet-container {
-  /* Mantén tus estilos de Leaflet aquí */
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 /* Solución para los dropdowns de PrimeNG */
